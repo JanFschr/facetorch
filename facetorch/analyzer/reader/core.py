@@ -4,6 +4,7 @@ from codetiming import Timer
 from facetorch.base import BaseReader
 from facetorch.datastruct import ImageData
 from facetorch.logger import LoggerJsonFile
+import numpy as np
 
 logger = LoggerJsonFile().logger
 
@@ -30,7 +31,7 @@ class ImageReader(BaseReader):
         )
 
     @Timer("ImageReader.run", "{name}: {milliseconds:.2f} ms", logger=logger.debug)
-    def run(self, path_image: str, fix_img_size: bool = False) -> ImageData:
+    def run(self, path_image: str | np.array, fix_img_size: bool = False) -> ImageData:
         """Reads an image from a path and returns a tensor of the image with values between 0-255 and shape (batch, channels, height, width). The order of color channels is RGB. PyTorch and Torchvision are used to read the image.
 
         Args:
@@ -40,10 +41,22 @@ class ImageReader(BaseReader):
         Returns:
             ImageData: ImageData object with image tensor and pil Image.
         """
-        data = ImageData(path_input=path_image)
-        data.img = torchvision.io.read_image(
-            data.path_input, mode=torchvision.io.ImageReadMode.RGB
-        )
+
+        #check if path_image is a numpy array
+        if isinstance(path_image, np.ndarray):
+            data = ImageData(path_input=None)
+            #convert numpy array to torch tensor and check if it is in float32 format
+            if path_image.dtype != np.float32:
+                path_image = (path_image/255.).astype(np.float32)
+            data.img = torch.from_numpy(path_image)
+            pass
+        
+        elif isinstance(path_image, str):
+            data = ImageData(path_input=path_image)
+            data.img = torchvision.io.read_image(
+                data.path_input, mode=torchvision.io.ImageReadMode.RGB
+            )
+
         data.img = data.img.unsqueeze(0)
         data.img = data.img.to(self.device)
 
@@ -55,3 +68,5 @@ class ImageReader(BaseReader):
         data.set_dims()
 
         return data
+
+
